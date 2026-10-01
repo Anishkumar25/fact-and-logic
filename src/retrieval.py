@@ -1,79 +1,63 @@
-import pandas as pd
+import os
+import re
+ 
 import numpy as np
-import nltk
-from nltk.tokenize import word_tokenize
+import pandas as pd
+from datasets import load_dataset
 from rank_bm25 import BM25Okapi
 from sentence_transformers import SentenceTransformer
-from datasets import load_dataset
-
-nltk.download("punkt", quiet=True)
-nltk.download("punkt_tab", quiet=True)
-
-
+ 
+CORPUS_URL = "hf://datasets/allenai/scifact@refs/convert/parquet/corpus/train/*.parquet"
+METHODS = ("bm25", "embedding", "hybrid")
+ 
+ 
+def tok(t):
+    return re.findall(r"\w+", t.lower())
+ 
+ 
+def ranks(s):
+    r = np.empty(len(s))
+    r[np.argsort(-s)] = np.arange(len(s))
+    return r
+ 
+ 
 def load_corpus():
-    ds = load_dataset(
-        "parquet",
-        data_files={"corpus": "hf://datasets/allenai/scifact@refs/convert/parquet/corpus/train/*.parquet"},
-    )
-    corpus_df = pd.DataFrame(ds["corpus"])
-    corpus_df["text"] = corpus_df["title"] + " " + corpus_df["abstract"].apply(lambda x: " ".join(x))
-    return corpus_df
-
-
-# ---------- BM25 baseline (kept for comparison in the report) ----------
-
-def build_bm25_index(corpus_df):
-    tokenized = [word_tokenize(t.lower()) for t in corpus_df["text"]]
-    return BM25Okapi(tokenized)
-
-
-def retrieve_bm25(claim, corpus_df, bm25, k=3):
-    tokens = word_tokenize(claim.lower())
-    scores = bm25.get_scores(tokens)
-    top_idx = scores.argsort()[::-1][:k]
-    return corpus_df.iloc[top_idx][["doc_id", "title", "text"]]
-
-
-# ---------- Embedding retrieval (the one we actually use) ----------
-
-_embedder = None
-
-
-def get_embedder():
-    global _embedder
-    if _embedder is None:
-        _embedder = SentenceTransformer("all-MiniLM-L6-v2")
-    return _embedder
-
-
-def build_embedding_index(corpus_df):
-    model = get_embedder()
-    embeddings = model.encode(corpus_df["text"].tolist(), show_progress_bar=True, batch_size=64)
-    return embeddings
-
-
-def retrieve_embedding(claim, corpus_df, corpus_embeddings, k=3):
-    model = get_embedder()
-    claim_emb = model.encode([claim])[0]
-    sims = corpus_embeddings @ claim_emb / (
-        np.linalg.norm(corpus_embeddings, axis=1) * np.linalg.norm(claim_emb)
-    )
-    top_idx = sims.argsort()[::-1][:k]
-    return corpus_df.iloc[top_idx][["doc_id", "title", "text"]], sims
-
-
+    df = pd.DataFrame(load_dataset("parquet", data_files={"c": CORPUS_URL})["c"])
+    df["sentences"] = df["abstract"].apply(list)
+    df["text"] = df["title"] + " " + df["sentences"].apply(" ".join)
+    return df
+ 
+ 
+class Retriever:
+    """BM25, dense (MiniLM) and hybrid (reciprocal rank fusion) retrieval over SciFact."""
+ 
+    def __init__(self, cache="data/corpus_emb.npy"):
+        self.df = load_corpus()
+        self.model = SentenceTransformer("all-MiniLM-L6-v2")
+        if os.path.exists(cache) and np.load(cache).shape[0] == len(self.df):
+            self.emb = np.load(cache)
+        else:
+            self.emb = self.model.encode(self.df["text"].tolist(), batch_size=64,
+                                         normalize_embeddings=True, show_progress_bar=True)
+            os.makedirs(os.path.dirname(cache), exist_ok=True)
+            np.save(cache, self.emb)
+        self.bm25 = BM25Okapi([tok(t) for t in self.df["text"]])
+ 
+    def scores(self, claim, method="hybrid"):
+        if method == "bm25":
+            return self.bm25.get_scores(tok(claim))
+        if method == "embedding":
+            return self.emb @ self.model.encode(claim, normalize_embeddings=True)
+        # reciprocal rank fusion of the two rankings (k=60 is the usual default)
+        return sum(1 / (60 + ranks(self.scores(claim, m))) for m in ("bm25", "embedding"))
+ 
+    def search(self, claim, k=3, method="hybrid"):
+        s = self.scores(claim, method)
+        idx = np.argsort(-s)[:k]
+        return self.df.iloc[idx].assign(score=s[idx])
+ 
+ 
 if __name__ == "__main__":
-    corpus_df = load_corpus()
-    test_claim = "0-dimensional biomaterials lack inductive properties."
-    gold_doc_id = 31715818
-
-    print("Building embedding index (one-time, ~1-2 min on CPU)...")
-    corpus_embeddings = build_embedding_index(corpus_df)
-
-    results, sims = retrieve_embedding(test_claim, corpus_df, corpus_embeddings, k=5)
-    print("\nTop 5 (embedding retrieval):")
-    print(results)
-
-    gold_idx = corpus_df[corpus_df["doc_id"] == gold_doc_id].index[0]
-    gold_rank = (sims.argsort()[::-1] == gold_idx).nonzero()[0][0]
-    print(f"\nGold doc rank: {gold_rank} out of {len(sims)}")
+    r = Retriever()
+    print(r.search("0-dimensional biomaterials lack inductive properties.", k=3)[["doc_id", "title", "score"]])
+ 
