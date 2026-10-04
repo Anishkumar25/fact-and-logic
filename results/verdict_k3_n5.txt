@@ -1,0 +1,11 @@
+thresholds: SUPPORT>=0.30, CONTRADICT>=0.90 (dev macro-F1 0.565)
+
+                 precision    recall  f1-score   support
+
+     CONTRADICT      0.512     0.688     0.587        64
+NOT_ENOUGH_INFO      0.523     0.705     0.601       112
+        SUPPORT      0.825     0.419     0.556       124
+
+       accuracy                          0.583       300
+      macro avg      0.620     0.604     0.581       300
+   weighted avg      0.646     0.583     0.579       300
