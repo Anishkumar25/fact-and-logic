@@ -22,17 +22,19 @@ def test_decide_thresholds():
     assert decide(0.6, 0.1, ts=0.7) == "NOT_ENOUGH_INFO"
 
 
-def test_parse_claims_handles_missing_evidence():
+def test_parse_claims_merges_rows_per_claim_and_handles_missing_evidence():
     raw = pd.DataFrame({
-        "id": [1, 2], "claim": ["a", "b"],
-        "evidence_doc_id": ["123", ""],
-        "evidence_label": ["support", ""],
-        "evidence_sentences": [np.array([0, 2]), np.array([])],
+        "id": [1, 1, 2], "claim": ["a", "a", "b"],
+        "evidence_doc_id": ["123", "456", ""],
+        "evidence_label": ["support", "support", ""],
+        "evidence_sentences": [np.array([0, 2]), np.array([1]), np.array([])],
     })
     out = parse_claims(raw)
+    assert len(out) == 2
     assert out.label.tolist() == ["SUPPORT", "NOT_ENOUGH_INFO"]
-    assert out.gold_doc.iloc[0] == 123 and np.isnan(out.gold_doc.iloc[1])
-    assert out.gold_sents.iloc[0] == [0, 2]
+    assert out.gold_docs.iloc[0] == [123, 456]
+    assert out.gold_sents.iloc[0] == {123: [0, 2], 456: [1]}
+    assert out.gold_docs.iloc[1] == []
 
 
 def test_tune_finds_separating_thresholds():

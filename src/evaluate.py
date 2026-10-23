@@ -15,28 +15,30 @@ from .verdict import decide
 
 
 def retrieval(r, df, ks=(1, 3, 5, 20), mode="hybrid") -> dict:
-    df = df[df.gold_doc.notna()]
+    df = df[df.gold_docs.map(len) > 0]
     ranks = []
-    for c, g in zip(df.claim, df.gold_doc):
+    for c, g in zip(df.claim, df.gold_docs):
         ids = r.search(c, max(ks), mode=mode).doc_id.tolist()
-        ranks.append(ids.index(int(g)) if int(g) in ids else 10**9)
+        ranks.append(min((ids.index(d) for d in g if d in ids), default=10**9))
     ranks = np.array(ranks)
     return {f"hit@{k}": float((ranks < k).mean()) for k in ks}
 
 
 def sentence_recall(v, df) -> float:
     """Share of claims where a gold evidence sentence is among the verifier's top-n sentences."""
-    df = df[df.gold_doc.notna()]
+    df = df[df.gold_docs.map(len) > 0]
     hits = []
-    for c, g, gs in zip(df.claim, df.gold_doc, df.gold_sents):
+    for c, gs in zip(df.claim, df.gold_sents):
         top = v.top_sentences(c, v.r.search(c, v.k))
-        hits.append(any(s[0] == int(g) and s[2] in gs for s in top))
+        hits.append(any(int(s[0]) in gs and s[2] in gs[int(s[0])] for s in top))
     return float(np.mean(hits))
 
 
 def score_all(v, df, cache=None) -> pd.DataFrame:
     if cache and cache.exists():
-        return pd.read_parquet(cache)
+        cached = pd.read_parquet(cache)
+        if len(cached) == len(df):  # a cache from an older run with different data is ignored
+            return cached
     out = pd.DataFrame([v.score(c) for c in df.claim])[["sup", "con"]]
     if cache:
         cache.parent.mkdir(parents=True, exist_ok=True)
