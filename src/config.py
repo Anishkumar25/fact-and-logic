@@ -18,3 +18,11 @@ FALLACY_MIN_PROB = float(os.getenv("FALLACY_MIN_PROB", "0.5"))
 
 SCIFACT = "hf://datasets/allenai/scifact@refs/convert/parquet/{cfg}/{split}/0000.parquet"
 LABELS = ("SUPPORT", "CONTRADICT", "NOT_ENOUGH_INFO")
+
+
+def device() -> str:
+    """DEVICE env var wins (set to cpu on Hugging Face Spaces); otherwise cuda if present."""
+    if os.getenv("DEVICE"):
+        return os.environ["DEVICE"]
+    import torch
+    return "cuda" if torch.cuda.is_available() else "cpu"

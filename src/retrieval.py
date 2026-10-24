@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 
 from . import data
-from .config import ART, EMB_MODEL
+from .config import ART, EMB_MODEL, device
 
 
 def _tok(t: str) -> list[str]:
@@ -27,7 +27,7 @@ class Retriever:
         from rank_bm25 import BM25Okapi
         from sentence_transformers import SentenceTransformer
 
-        self.model = SentenceTransformer(EMB_MODEL)
+        self.model = SentenceTransformer(EMB_MODEL, device=device())
         self.docs = (data.corpus() if corpus is None else corpus).reset_index(drop=True)
         text = (self.docs.title + ". " + self.docs.sentences.map(" ".join)).tolist()
         self.bm25 = BM25Okapi([_tok(t) for t in text])

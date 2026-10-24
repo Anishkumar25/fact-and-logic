@@ -3,7 +3,7 @@ import json
 
 import numpy as np
 
-from .config import NLI_MODEL, THRESHOLDS
+from .config import NLI_MODEL, THRESHOLDS, device
 
 
 def decide(sup: float, con: float, ts: float = 0.5, tc: float = 0.5) -> str:
@@ -30,11 +30,10 @@ class Verifier:
         self.rr = Reranker() if reranker is True else (reranker or None)
         self._nli = None
 
-    def _load(self):
-        import torch
+    def load(self):
         from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
-        self.dev = "cuda" if torch.cuda.is_available() else "cpu"
+        self.dev = device()
         self.tok = AutoTokenizer.from_pretrained(NLI_MODEL)
         self._nli = AutoModelForSequenceClassification.from_pretrained(NLI_MODEL).eval().to(self.dev)
         names = [self._nli.config.id2label[i].lower() for i in range(self._nli.config.num_labels)]
@@ -63,7 +62,7 @@ class Verifier:
         import torch
 
         if self._nli is None:
-            self._load()
+            self.load()
         enc = self.tok(premises, [claim] * len(premises), return_tensors="pt", padding=True,
                        truncation=True, max_length=256).to(self.dev)
         with torch.no_grad():

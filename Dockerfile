@@ -12,7 +12,7 @@ COPY thresholds.js[o]n ./
 # Bake weights and the search index into the image so cold starts are fast.
 RUN python -m src.retrieval \
  && python -c "from src.rerank import Reranker; Reranker()" \
- && python -c "from src.verdict import Verifier; v = Verifier(reranker=False); v._load()"
+ && python -c "from src.verdict import Verifier; v = Verifier(reranker=False); v.load()"
 
 RUN useradd -m app && chown -R app /app /models
 USER app

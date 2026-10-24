@@ -1,5 +1,6 @@
 ---
 title: Fact and Logic
+emoji: 🔎
 colorFrom: blue
 colorTo: indigo
 sdk: gradio
@@ -63,21 +64,24 @@ Train the fallacy model on a free Colab GPU with `notebooks/04_fallacy.ipynb`, o
 
 ## Deploy for free
 
-**Hugging Face Spaces (recommended).** The front matter at the top of this file is what Spaces reads.
+Hugging Face now charges for CPU Spaces on Gradio and Docker, but a free account can host up to two Gradio Spaces on **ZeroGPU**. That's what this repo targets.
 
-1. Create a Space, pick the Gradio SDK and the free CPU hardware.
-2. Push the repo to it: `git remote add space https://huggingface.co/spaces/<you>/fact-and-logic`, then `git push space main`.
-3. Push your trained fallacy model to the Hub (`python -m src.fallacy --push <you>/fact-and-logic-fallacy`) and set a Space variable `FALLACY_MODEL` to that id.
-4. The first boot builds the search index, which takes a few minutes. Free Spaces sleep when idle, so expect a slow first request after a quiet spell.
+1. Create a Space, pick the Gradio SDK, and choose the free ZeroGPU hardware.
+2. Open the README.md that Hugging Face generated in the Space, copy its `sdk_version` line, and add it to the front matter of this README.
+3. Push the repo to the Space: `git remote add space https://huggingface.co/spaces/<you>/fact-and-logic`, then `git push space <your-branch>:main --force`. The force is needed because the Space starts with one placeholder commit.
+4. Push your trained fallacy model to the Hub (`python -m src.fallacy --push <you>/fact-and-logic`) and add a Space variable `FALLACY_MODEL` set to that id.
+5. The first boot downloads the models and builds the search index, which takes several minutes.
 
-**Docker / API.** The same pipeline is available as a REST service:
+`app.py` detects it is running on a Space and keeps inference on the CPU. It registers a no-op `@spaces.GPU` function only because ZeroGPU refuses to start a Space without one. Visitors therefore don't use up their GPU quota, and the free CPU takes a few seconds per claim. The Space sleeps when idle.
+
+**Docker / API.** The same pipeline is available as a REST service for any host that runs containers:
 
 ```
 docker build -t fact-and-logic .
 docker run -p 8000:8000 -e FALLACY_MODEL=<you>/fact-and-logic-fallacy fact-and-logic
 ```
 
-Then `POST /verify` with `{"text": "..."}`. Interactive docs are at `/docs` and `/health` is the liveness check. Any container host with a free tier works (Render, Fly.io, Cloud Run).
+Then `POST /verify` with `{"text": "..."}`. Interactive docs are at `/docs` and `/health` is the liveness check. Docker Spaces on Hugging Face need a paid plan, so use another host for this one.
 
 ## Configuration
 
@@ -88,6 +92,7 @@ Then `POST /verify` with `{"text": "..."}`. Interactive docs are at `/docs` and 
 | `EMB_MODEL` | sentence-transformers/all-MiniLM-L6-v2 | retrieval embeddings |
 | `FALLACY_MODEL` | artifacts/fallacy | local folder or Hub id |
 | `FALLACY_MIN_PROB` | 0.5 | fallacy guesses below this confidence are hidden |
+| `DEVICE` | auto | `cpu` or `cuda`; the app sets `cpu` on Spaces |
 | `ARTIFACTS_DIR` | artifacts | index, scores and trained models |
 
 ## Project layout

@@ -11,6 +11,10 @@ class Pipeline:
     def __init__(self, verifier, fallacy=None, min_prob=FALLACY_MIN_PROB):
         self.verifier, self.fallacy, self.min_prob = verifier, fallacy, min_prob
 
+    def warm(self):
+        """Load the lazily-loaded NLI model now so the first request isn't slow."""
+        self.verifier.load()
+
     def run(self, text: str) -> dict:
         guesses = self.fallacy.predict(text) if self.fallacy else []
         return {"claim": text, "verdict": self.verifier.verify(text),

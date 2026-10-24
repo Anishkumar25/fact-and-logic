@@ -1,7 +1,25 @@
 """Gradio demo (Hugging Face Spaces entry point).  python app.py"""
+import os
+
+try:  # present on Hugging Face Spaces; imported first, as ZeroGPU recommends
+    import spaces
+except ImportError:
+    spaces = None
+
 import gradio as gr
 
 from src.pipeline import get_pipeline
+
+if os.getenv("SPACE_ID"):  # on Spaces the GPU only exists inside @spaces.GPU calls, so stay on CPU
+    os.environ.setdefault("DEVICE", "cpu")
+
+if spaces:
+    @spaces.GPU
+    def _gpu_probe():
+        """ZeroGPU refuses to start a Space with no @spaces.GPU function. Never called."""
+
+PIPE = get_pipeline()
+PIPE.warm()
 
 EXAMPLES = [
     "0-dimensional biomaterials lack inductive properties.",
@@ -15,7 +33,7 @@ NAMES = {"SUPPORT": "Supported", "CONTRADICT": "Refuted", "NOT_ENOUGH_INFO": "No
 def check(text: str):
     if not text or len(text.strip()) < 3:
         return "Enter a claim to check.", "", None
-    r = get_pipeline().run(text.strip())
+    r = PIPE.run(text.strip())
     v = r["verdict"]
     head = (f"## {NAMES[v['label']]}  ({v['confidence']:.0%})\n\n"
             f"Closest source: *{v['source']}* (SciFact doc {v['doc_id']})")

@@ -5,17 +5,16 @@ import json
 
 import numpy as np
 
-from .config import ART, FALLACY_BASE, FALLACY_DS, FALLACY_MODEL, REPORTS
+from .config import ART, FALLACY_BASE, FALLACY_DS, FALLACY_MODEL, REPORTS, device
 
 TEXT, LABEL = "source_article", "logical_fallacies"
 
 
 class FallacyDetector:
     def __init__(self, path: str = FALLACY_MODEL):
-        import torch
         from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
-        self.dev = "cuda" if torch.cuda.is_available() else "cpu"
+        self.dev = device()
         self.tok = AutoTokenizer.from_pretrained(path)
         self.m = AutoModelForSequenceClassification.from_pretrained(path).eval().to(self.dev)
 
