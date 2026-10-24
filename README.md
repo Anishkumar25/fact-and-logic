@@ -87,6 +87,7 @@ Then `POST /verify` with `{"text": "..."}`. Interactive docs are at `/docs` and 
 | `RERANK_MODEL` | cross-encoder/ms-marco-MiniLM-L-6-v2 | sentence reranker; try `ncbi/MedCPT-Cross-Encoder` for biomedical text |
 | `EMB_MODEL` | sentence-transformers/all-MiniLM-L6-v2 | retrieval embeddings |
 | `FALLACY_MODEL` | artifacts/fallacy | local folder or Hub id |
+| `FALLACY_MIN_PROB` | 0.5 | fallacy guesses below this confidence are hidden |
 | `ARTIFACTS_DIR` | artifacts | index, scores and trained models |
 
 ## Project layout

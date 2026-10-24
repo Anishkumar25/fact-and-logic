@@ -2,16 +2,20 @@
 import logging
 from functools import lru_cache
 
+from .config import FALLACY_MIN_PROB
+
 log = logging.getLogger("fact-and-logic")
 
 
 class Pipeline:
-    def __init__(self, verifier, fallacy=None):
-        self.verifier, self.fallacy = verifier, fallacy
+    def __init__(self, verifier, fallacy=None, min_prob=FALLACY_MIN_PROB):
+        self.verifier, self.fallacy, self.min_prob = verifier, fallacy, min_prob
 
     def run(self, text: str) -> dict:
+        guesses = self.fallacy.predict(text) if self.fallacy else []
         return {"claim": text, "verdict": self.verifier.verify(text),
-                "fallacies": self.fallacy.predict(text) if self.fallacy else []}
+                "fallacies": [f for f in guesses if f["prob"] >= self.min_prob],
+                "fallacy_model": self.fallacy is not None}
 
 
 @lru_cache(maxsize=1)

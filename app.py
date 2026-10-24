@@ -20,6 +20,8 @@ def check(text: str):
     head = (f"## {NAMES[v['label']]}  ({v['confidence']:.0%})\n\n"
             f"Closest source: *{v['source']}* (SciFact doc {v['doc_id']})")
     fal = {f["label"]: f["prob"] for f in r["fallacies"]} or None
+    if fal is None and r["fallacy_model"]:
+        head += "\n\nNo logical fallacy flagged with enough confidence."
     return head, v["evidence"], fal
 
 
