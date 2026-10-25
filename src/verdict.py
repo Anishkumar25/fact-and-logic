@@ -53,7 +53,8 @@ class Verifier:
 
         self.dev = device()
         self.tok = AutoTokenizer.from_pretrained(self.nli_name)
-        self._nli = AutoModelForSequenceClassification.from_pretrained(self.nli_name).eval().to(self.dev)
+        nli = AutoModelForSequenceClassification.from_pretrained(self.nli_name)
+        self._nli = nli.float().eval().to(self.dev)
         names = [self._nli.config.id2label[i].lower() for i in range(self._nli.config.num_labels)]
         self.i_ent, self.i_con = names.index("entailment"), names.index("contradiction")
 
