@@ -56,7 +56,8 @@ def train(out=None, base=NLI_MODEL, epochs=3, lr=1e-5, bs=16, neg=1, seed=42):
     print("train pairs", tr.label.value_counts().to_dict(), "| dev pairs", dev.label.value_counts().to_dict())
 
     tok = AutoTokenizer.from_pretrained(base)
-    model = AutoModelForSequenceClassification.from_pretrained(base)
+    # .float(): newer transformers load fp16 checkpoints as fp16, which breaks mixed-precision training
+    model = AutoModelForSequenceClassification.from_pretrained(base).float()
     l2i = {n.lower(): i for i, n in model.config.id2label.items()}
 
     def prep(df):
