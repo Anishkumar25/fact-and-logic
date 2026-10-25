@@ -14,15 +14,33 @@ def decide(sup: float, con: float, ts: float = 0.5, tc: float = 0.5) -> str:
     return "NOT_ENOUGH_INFO"
 
 
+def load_thresholds(model: str | None = None) -> dict:
+    """thresholds.json holds default thresholds plus optional per-NLI-model overrides."""
+    saved = json.loads(THRESHOLDS.read_text()) if THRESHOLDS.exists() else {}
+    t = {**saved, **saved.get("models", {}).get(model, {})}
+    return {k: t[k] for k in ("ts", "tc") if k in t}
+
+
+def save_thresholds(ts: float, tc: float, model: str | None = None) -> None:
+    saved = json.loads(THRESHOLDS.read_text()) if THRESHOLDS.exists() else {}
+    if model:
+        saved.setdefault("models", {})[model] = {"ts": ts, "tc": tc}
+    else:
+        saved.update(ts=ts, tc=tc)
+    THRESHOLDS.write_text(json.dumps(saved, indent=2))
+
+
 class Verifier:
     """reranker: True = build the default cross-encoder, False/None = bi-encoder fallback,
     or pass a Reranker instance. Thresholds default to thresholds.json if present."""
 
-    def __init__(self, retriever=None, reranker=True, ts=None, tc=None, k=3, n=5, pair=True):
+    def __init__(self, retriever=None, reranker=True, ts=None, tc=None, k=3, n=5, pair=True,
+                 nli_model=None):
         from .rerank import Reranker
         from .retrieval import Retriever
 
-        saved = json.loads(THRESHOLDS.read_text()) if THRESHOLDS.exists() else {}
+        self.nli_name = nli_model or NLI_MODEL
+        saved = load_thresholds(self.nli_name)
         self.ts = saved.get("ts", 0.5) if ts is None else ts
         self.tc = saved.get("tc", 0.5) if tc is None else tc
         self.k, self.n, self.pair = k, n, pair
@@ -34,8 +52,8 @@ class Verifier:
         from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
         self.dev = device()
-        self.tok = AutoTokenizer.from_pretrained(NLI_MODEL)
-        self._nli = AutoModelForSequenceClassification.from_pretrained(NLI_MODEL).eval().to(self.dev)
+        self.tok = AutoTokenizer.from_pretrained(self.nli_name)
+        self._nli = AutoModelForSequenceClassification.from_pretrained(self.nli_name).eval().to(self.dev)
         names = [self._nli.config.id2label[i].lower() for i in range(self._nli.config.num_labels)]
         self.i_ent, self.i_con = names.index("entailment"), names.index("contradiction")
 

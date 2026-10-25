@@ -10,8 +10,8 @@ import pandas as pd
 from sklearn.metrics import accuracy_score, classification_report, f1_score
 
 from . import data
-from .config import ART, LABELS, REPORTS, THRESHOLDS
-from .verdict import decide
+from .config import ART, LABELS, REPORTS
+from .verdict import decide, save_thresholds
 
 
 def retrieval(r, df, ks=(1, 3, 5, 20), mode="hybrid") -> dict:
@@ -50,7 +50,7 @@ def _pred(s, ts, tc):
     return [decide(a, b, ts, tc) for a, b in zip(s.sup, s.con)]
 
 
-def tune(s, y, grid=np.arange(0.3, 0.96, 0.05)) -> dict:
+def tune(s, y, grid=np.r_[np.arange(0.1, 0.96, 0.05), 0.99]) -> dict:
     y, best = list(y), (-1.0, 0.5, 0.5)
     for ts in grid:
         for tc in grid:
@@ -77,6 +77,7 @@ def main():
     ap.add_argument("--split", default="validation")
     ap.add_argument("--limit", type=int, help="use only the first N claims (smoke test)")
     ap.add_argument("--no-rerank", action="store_true")
+    ap.add_argument("--nli", help="fine-tuned NLI model (folder or Hub id) instead of the zero-shot one")
     a = ap.parse_args()
 
     def cut(df):
@@ -91,17 +92,21 @@ def main():
         out = {name: sentence_recall(Verifier(r, reranker=rr), df)
                for name, rr in (("bi-encoder", False), ("cross-encoder", True))}
     else:
-        v = Verifier(r, reranker=not a.no_rerank)
-        tag = f"{'bi' if a.no_rerank else 'rr'}_{a.limit or 'all'}"
+        v = Verifier(r, reranker=not a.no_rerank, nli_model=a.nli)
+        tag = f"{'bi' if a.no_rerank else 'rr'}_{'ft' if a.nli else 'zs'}_{a.limit or 'all'}"
         tr, va = cut(data.claims("train")), cut(data.claims(a.split))
+        if a.nli:  # tune on claims the fine-tuned model never trained on
+            from .train_nli import split_claims
+            tr = split_claims(tr)[1]
         st = score_all(v, tr, ART / f"scores_train_{tag}.parquet")
         sv = score_all(v, va, ART / f"scores_{a.split}_{tag}.parquet")
         best = tune(st, tr.label)
-        out = {"tuned_on": "train", "reported_on": a.split, "thresholds": best,
+        tuned_on = "held-out train claims" if a.nli else "train"
+        out = {"tuned_on": tuned_on, "reported_on": a.split, "thresholds": best,
                "default_0.5": report(sv, va.label, 0.5, 0.5),
                "tuned": report(sv, va.label, best["ts"], best["tc"])}
         if not a.limit:
-            THRESHOLDS.write_text(json.dumps({"ts": best["ts"], "tc": best["tc"]}, indent=2))
+            save_thresholds(best["ts"], best["tc"], a.nli)
     REPORTS.mkdir(exist_ok=True)
     (REPORTS / f"{a.task}.json").write_text(json.dumps(out, indent=2))
     print(json.dumps(out, indent=2))
