@@ -14,7 +14,7 @@ FALLACY_MODEL = os.getenv("FALLACY_MODEL", str(ART / "fallacy"))  # local dir or
 FALLACY_BASE = os.getenv("FALLACY_BASE", "distilroberta-base")
 FALLACY_DS = "tasksource/logical-fallacy"
 # The fallacy model has no "no fallacy" class, so only show guesses above this confidence.
-FALLACY_MIN_PROB = float(os.getenv("FALLACY_MIN_PROB", "0.5"))
+FALLACY_MIN_PROB = float(os.getenv("FALLACY_MIN_PROB", "0.7"))
 
 SCIFACT = "hf://datasets/allenai/scifact@refs/convert/parquet/{cfg}/{split}/0000.parquet"
 LABELS = ("SUPPORT", "CONTRADICT", "NOT_ENOUGH_INFO")
