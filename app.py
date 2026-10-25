@@ -22,10 +22,11 @@ PIPE = get_pipeline()
 PIPE.warm()
 
 EXAMPLES = [
-    "0-dimensional biomaterials lack inductive properties.",
-    "Vitamin D deficiency is associated with an increased risk of tuberculosis.",
-    "Everyone I know got better after taking it, so it must work.",
+    "Autophagy declines in aged organisms.",
+    "Antibiotic induced alterations in the gut microbiome reduce resistance against Clostridium difficile.",
+    "Articles published in open access format are less likely to be cited than traditional journals.",
     "You can't trust his research on diet, he's overweight himself.",
+    "Vitamin D deficiency is associated with an increased risk of tuberculosis.",
 ]
 NAMES = {"SUPPORT": "Supported", "CONTRADICT": "Refuted", "NOT_ENOUGH_INFO": "Not enough info"}
 
