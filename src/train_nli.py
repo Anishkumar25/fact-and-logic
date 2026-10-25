@@ -72,7 +72,8 @@ def train(out=None, base=NLI_MODEL, epochs=3, lr=1e-5, bs=16, neg=1, seed=42):
 
     args = TrainingArguments(
         output_dir=str(ART / "nli_runs"), num_train_epochs=epochs, learning_rate=lr, weight_decay=0.01,
-        warmup_ratio=0.1, per_device_train_batch_size=bs, per_device_eval_batch_size=bs * 2,
+        warmup_steps=int(0.1 * epochs * -(-len(tr) // bs)),
+        per_device_train_batch_size=bs, per_device_eval_batch_size=bs * 2,
         eval_strategy="epoch", save_strategy="epoch", load_best_model_at_end=True,
         metric_for_best_model="macro_f1", save_total_limit=1, report_to="none",
         fp16=torch.cuda.is_available(), seed=seed)
